@@ -1,0 +1,17 @@
+Images(ImageID, Image)
+
+Classes(ClassID, Year, Section, AcademicYear, ImageID^)
+
+Accounts (AccountID, Name, Surname, Age, ImageID^)
+
+Professors (ProfessorID, AccountID^, ClassID^, Subject)
+
+Students (StudentID, AccountID^, ClassID^)
+
+Grades (GradeID, ProfessorID^, StudentID^, Grade, Date)
+
+Notes (NoteID, ProfessorID^, StudentID^, Date, Content)
+
+Homework(HomeworkID, ClassID^, ProfID^, Subject^, Content)
+
+
