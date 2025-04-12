@@ -6,7 +6,7 @@ from pathlib import Path
 import os
 
 class SQLite: 
-    # understand when to commit
+    # NEED TO UNDERSTAND when to commit
     def __init__(self, path): 
         '''Creates a new SQLite database
         Args:
@@ -177,11 +177,8 @@ class GUI:
     
     def DestroyRoot(self): 
         self.root.destroy()
-    
-    # FUNCTIONS TO CREATE, FILL AND HANDLE PREMADE WINDOWS FOR THE PROF SIMULATOR PROJECT
 
 class Controller: 
-    # basically all, cmon man less go
     def __init__(self, gui_title, gui_size='500x500',  database_path='', type='',): 
         '''Creates a new Controller
         Args:
@@ -212,10 +209,10 @@ class Controller:
                 self.db.CreateTable(table, columns)
         file.close()
         
-        with open('db\\tables_population.csv', 'r') as file: # iterates over almost all columns of all tabls, csv solution
+        with open('db\\tables_population.csv', 'r') as file: # iterates over almost all columns of all tables, csv solution
             myreader = reader(file)
             for table, columns, values in myreader:
-                self.db.InsertIntoTable(table, columns, values) # A COLUMN PROBLEM
+                self.db.InsertIntoTable(table, columns, values) # ERROR HERE TO RESOLVE: COLUMN PROBLEM
                 
             for image_path in Path('img\\AccountsPics').iterdir(): # iterates for image column of images, to handle blob data
                 if image_path.suffix.lower() in [".jpeg", ".jpg"]:
