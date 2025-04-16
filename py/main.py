@@ -1,7 +1,6 @@
 import tkinter as tk
 import sqlite3 as sql
 from csv import reader
-from PIL import ImageTk, Image
 from pathlib import Path
 import os
 
