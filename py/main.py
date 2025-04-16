@@ -34,18 +34,20 @@ class SQLite:
         '''Inserts values into the table   
         Args:
             table_name (str): name of the table
-            columns (str): columns of the table, each column is separated by a comma
-            values (): values to be inserted, each value is separated by a comma
+            columns (str): columns of the table
+            values (tuple of str): values to be inserted
+            blob (bool): if True, the values will be converted into blob data
         '''
-        values = values.split(", ")
-        formatted_values = ", ".join(
-            f"'{v}'" if not v.replace(".", "").isdigit() else v
-            for v in values
-        )
-        if blob: 
-            self.cursor.execute(f"INSERT INTO {table_name} ({columns}) VALUES (?);", values.read_bytes())
-        else: 
-            self.cursor.execute(f"INSERT INTO {table_name} ({columns}) VALUES ({values});")
+        # ALL EXCLUDED ID's ARE SAVED AS TEXT, REVIEW FUNC IN Controller CLASS
+        # UNDERSTAND HOW TO HANDLE BLOB FILE DOWN HERE, UNDERSTAND WHERE AND HOW TO USE READ_BYTES FUNC
+        print(values)
+        placeholders = ('?,' * len(values))[:-1] # string with as many ? as values, then removes last char, which is ','
+        print(placeholders)
+        # creates a string with the same number of ? as the number of values
+        if blob:
+            values = (value.read_bytes() for value in values) # transform values elements into bytes elements
+            
+        self.cursor.execute(f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders});", values)
         self.cursor.connection.commit()
         
     def ChangeValuesInTable(self, table_name, columns, values, condition):
@@ -176,8 +178,6 @@ class GUI:
     
     def DestroyRoot(self): 
         self.root.destroy()
-    
-    # FUNCTIONS TO CREATE, FILL AND HANDLE PREMADE WINDOWS FOR THE PROF SIMULATOR PROJECT
 
 class Controller: 
     # basically all, cmon man less go
@@ -189,7 +189,7 @@ class Controller:
             database_path (str): path to the database
             type (str): type of premade GUI and DB(Prof Simulator)
         '''
-        self.gui = GUI(gui_title, gui_size) #need to delete this type here, will do later
+        self.gui = GUI(gui_title, gui_size)
         self.db = SQLite(database_path)
         
         if type == 'Prof Simulator': 
@@ -199,6 +199,30 @@ class Controller:
             
     def GuiMainloop (self): 
         self.gui.root.mainloop()
+        
+    def TransformTupleIntoCorrectDataTypes(self, old_tuple):
+        '''Takes a tuple as a parameter and returns a tuple with corrected data types for each element,\n
+        Supports integer, float and bool changes
+        Args:
+            old_tuple (tuple): tuple to be transformed
+        '''
+        temp_list = [] #temponary list to use append method
+        for value in old_tuple:
+            #string case
+            if value[0] == "'" and value[-1] == "'":
+                temp_list.append(value)
+            else: 
+                # bool case
+                if value == 'True' or value == 'False':
+                    temp_list.append(bool(value)) 
+                # float case
+                elif value.find('.') != -1:
+                    temp_list.append(float(value))
+                # integer
+                else:
+                    temp_list.append(int(value))
+                    
+        return tuple(temp_list) # returns tuple from converted list 
             
     def GenerateProfSimulatorDb(self): 
         '''Creates the tables for the Prof Simulator, then populates them, all with premade files (csv and jpeg)\n
@@ -214,11 +238,12 @@ class Controller:
         with open('db\\tables_population.csv', 'r') as file: # iterates over almost all columns of all tabls, csv solution
             myreader = reader(file)
             for table, columns, values in myreader:
-                self.db.InsertIntoTable(table, columns, values) # A COLUMN PROBLEM
+                tuple_values = self.TransformTupleIntoCorrectDataTypes (tuple (values.split(", "))) 
+                self.db.InsertIntoTable(table, columns, tuple_values) 
                 
             for image_path in Path('img\\AccountsPics').iterdir(): # iterates for image column of images, to handle blob data
                 if image_path.suffix.lower() in [".jpeg", ".jpg"]:
-                    self.db.InsertIntoTable("images", "image", image_path, True)
+                    self.db.InsertIntoTable("images", "image", (image_path,), True)
                     
         file.close()
         
