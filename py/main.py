@@ -5,7 +5,7 @@ from pathlib import Path
 import os
 
 class SQLite: 
-    # understand when to commit
+    # NEED TO UNDERSTAND when to commit
     def __init__(self, path): 
         '''Creates a new SQLite database
         Args:
@@ -180,7 +180,6 @@ class GUI:
         self.root.destroy()
 
 class Controller: 
-    # basically all, cmon man less go
     def __init__(self, gui_title, gui_size='500x500',  database_path='', type='',): 
         '''Creates a new Controller
         Args:
@@ -235,7 +234,7 @@ class Controller:
                 self.db.CreateTable(table, columns)
         file.close()
         
-        with open('db\\tables_population.csv', 'r') as file: # iterates over almost all columns of all tabls, csv solution
+        with open('db\\tables_population.csv', 'r') as file: # iterates over almost all columns of all tables, csv solution
             myreader = reader(file)
             for table, columns, values in myreader:
                 tuple_values = self.TransformTupleIntoCorrectDataTypes (tuple (values.split(", "))) 
