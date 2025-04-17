@@ -4,6 +4,8 @@ from csv import reader
 from pathlib import Path
 import os
 
+# TODO: Control SQlite class functions, check if they work (create table and insert into table are already checked)
+# TODO: Continue developing Controller class
 class SQLite: 
     # NEED TO UNDERSTAND when to commit
     def __init__(self, path): 
@@ -30,23 +32,15 @@ class SQLite:
         self.cursor.execute(f"CREATE TABLE {table_name} ({column_names})") 
         self.cursor.connection.commit()
         
-    def InsertIntoTable(self, table_name, columns, values, blob=False):
+    def InsertIntoTable(self, table_name, columns, values):
         '''Inserts values into the table   
         Args:
             table_name (str): name of the table
             columns (str): columns of the table
             values (tuple of str): values to be inserted
-            blob (bool): if True, the values will be converted into blob data
         '''
-        # ALL EXCLUDED ID's ARE SAVED AS TEXT, REVIEW FUNC IN Controller CLASS
-        # UNDERSTAND HOW TO HANDLE BLOB FILE DOWN HERE, UNDERSTAND WHERE AND HOW TO USE READ_BYTES FUNC
-        print(values)
         placeholders = ('?,' * len(values))[:-1] # string with as many ? as values, then removes last char, which is ','
-        print(placeholders)
-        # creates a string with the same number of ? as the number of values
-        if blob:
-            values = (value.read_bytes() for value in values) # transform values elements into bytes elements
-            
+        
         self.cursor.execute(f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders});", values)
         self.cursor.connection.commit()
         
@@ -55,10 +49,12 @@ class SQLite:
         Args:
             table_name (str): name of the table
             columns (str): columns to be changed, each column is separated by a comma
-            values (str): values to be inserted, each value is separated by a comma
+            values (tuple): values to insert
             condition (str): condition to change values
         '''
-        self.cursor.execute(f"UPDATE {table_name} SET {columns} = {values} WHERE {condition};")
+        placeholders = ('?,' * len(values))[:-1] 
+
+        self.cursor.execute(f"UPDATE {table_name} SET {columns} = {placeholders} WHERE {condition};", values)
         self.cursor.connection.commit()
         
     def ReadFromTable(self, table_name, columns, condition, response_size=0):
@@ -199,7 +195,7 @@ class Controller:
     def GuiMainloop (self): 
         self.gui.root.mainloop()
         
-    def TransformTupleIntoCorrectDataTypes(self, old_tuple):
+    def CorrectsDataTypesOfStrTuple(self, old_tuple):
         '''Takes a tuple as a parameter and returns a tuple with corrected data types for each element,\n
         Supports integer, float and bool changes
         Args:
@@ -220,9 +216,26 @@ class Controller:
                 # integer
                 else:
                     temp_list.append(int(value))
-                    
+                              
         return tuple(temp_list) # returns tuple from converted list 
+    
+    # codice orrendo, non so come migliorarlo, l'importante è che funziona
+    def FromFilesInFolderToBlobTuple(self, folder_path, images = False): 
+        '''Given a folder path that contains images, it returns a tuple which each image in blob data type
+        Args:   
+            folder_path (str): path to the folder
+            images (bool): if True, it will only return images, if False, it will return all files in the folder
+        Returns:
+            tuple: tuple of images in blob data type
+        '''
+        temp_list = [] #temponary list to use append method
+        
+        for path in Path(folder_path).iterdir(): # iterates for all files in the folder, gets each file path
+                with open(path, 'rb') as file: 
+                    temp_list.append(file.read())    
             
+        return tuple(temp_list)
+    
     def GenerateProfSimulatorDb(self): 
         '''Creates the tables for the Prof Simulator, then populates them, all with premade files (csv and jpeg)\n
         All columns of all tables are populated with csv files\n
@@ -236,22 +249,21 @@ class Controller:
         
         with open('db\\tables_population.csv', 'r') as file: # iterates over almost all columns of all tables, csv solution
             myreader = reader(file)
-            for table, columns, values in myreader:
-                tuple_values = self.TransformTupleIntoCorrectDataTypes (tuple (values.split(", "))) 
+            for table, columns, values in myreader: 
+                tuple_values = self.CorrectsDataTypesOfStrTuple (tuple(values.split(", "))) 
                 self.db.InsertIntoTable(table, columns, tuple_values) 
+        file.close()        
                 
-            for image_path in Path('img\\AccountsPics').iterdir(): # iterates for image column of images, to handle blob data
-                if image_path.suffix.lower() in [".jpeg", ".jpg"]:
-                    self.db.InsertIntoTable("images", "image", (image_path,), True)
-                    
-        file.close()
+        tuple_values = self.FromFilesInFolderToBlobTuple('img\\AccountsPics', True)
+        for i, value in enumerate(tuple_values): 
+            self.db.ChangeValuesInTable('images', 'image', (value,), f'image_id={i+1}')
         
     def SetupProfSimulatorGui(self):
         self._prof_window_cascades = ['Menu', 'Classes']
         self._class_window_cascades = ['Menu', 'Students', 'Homework', 'Notes']
         self._student_window_cascades = ['Menu', 'Grades', 'Notes']
      
-        # classes = from database, below is just example 
+        # classes = from database, below is just example <--
         self._prof_window_buttons = [{
                 'Profile': self.ProfWindow, 
                 'Exit': self.gui.root.quit}, 
