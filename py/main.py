@@ -57,15 +57,15 @@ class SQLite:
         self.cursor.execute(f"UPDATE {table_name} SET {columns} = {placeholders} WHERE {condition};", values)
         self.cursor.connection.commit()
         
-    def ReadFromTable(self, table_name, columns, condition, response_size=0):
-        '''Returns rows (list of lists) from the table
+    def ReadFromTable(self, table_name, columns, condition = True, response_size = 0):
+        '''Returns rows (list of tuples) from the table
         Args: 
             table_name (str): name of the table
             columns (str): columns to be returned, each column is separated by a comma
             condition (str): condition to return values
             response_size (int): number of rows to be returned 
         Returns: 
-            list of lists (table rows)
+            list of tuples (table rows)
         '''
         self.cursor.execute(f"SELECT {columns} FROM {table_name} WHERE {condition};")
         
@@ -188,9 +188,9 @@ class Controller:
         self.db = SQLite(database_path)
         
         if type == 'Prof Simulator': 
-            self.SetupProfSimulatorGui()
             if os.path.getsize(database_path) == 0: # creates and populate new db only if it's first access
                 self.GenerateProfSimulatorDb()
+            self.SetupProfSimulatorGui()
             
     def GuiMainloop (self): 
         self.gui.root.mainloop()
@@ -205,22 +205,24 @@ class Controller:
         for value in old_tuple:
             #string case
             if value[0] == "'" and value[-1] == "'":
-                temp_list.append(value)
+                temp_list.append(value.replace("'", "")) # removes ' from string
+            # boolean case
+            elif value == 'True' or value == 'False':
+                temp_list.append(bool(value)) 
+            # float case
+            elif value.find('.') != -1:
+                temp_list.append(float(value))
+            # integer
+            elif value.isnumeric():
+                temp_list.append(int(value))
+            # other
             else: 
-                # bool case
-                if value == 'True' or value == 'False':
-                    temp_list.append(bool(value)) 
-                # float case
-                elif value.find('.') != -1:
-                    temp_list.append(float(value))
-                # integer
-                else:
-                    temp_list.append(int(value))
-                              
+                temp_list.append(value)
+                                 
         return tuple(temp_list) # returns tuple from converted list 
     
     # codice orrendo, non so come migliorarlo, l'importante è che funziona
-    def FromFilesInFolderToBlobTuple(self, folder_path, images = False): 
+    def FromFilesInFolderToBlobTuple(self, folder_path): 
         '''Given a folder path that contains images, it returns a tuple which each image in blob data type
         Args:   
             folder_path (str): path to the folder
@@ -241,48 +243,50 @@ class Controller:
         All columns of all tables are populated with csv files\n
         Only image column of images table is populated apart to handle blob files
         '''     
-        with open('db\\tables_generation.csv', 'r') as file:
+        with open('db\\tables_generation.csv', 'r') as file: # creates tables
             myreader = reader(file)
             for table, columns in myreader:
                 self.db.CreateTable(table, columns)
         file.close()
         
-        with open('db\\tables_population.csv', 'r') as file: # iterates over almost all columns of all tables, csv solution
+        with open('db\\tables_population.csv', 'r') as file: # populates tables with csv
             myreader = reader(file)
             for table, columns, values in myreader: 
-                tuple_values = self.CorrectsDataTypesOfStrTuple (tuple(values.split(", "))) 
+                tuple_values = self.CorrectsDataTypesOfStrTuple( tuple( values.split(", "))) 
                 self.db.InsertIntoTable(table, columns, tuple_values) 
         file.close()        
                 
-        tuple_values = self.FromFilesInFolderToBlobTuple('img\\AccountsPics', True)
-        for i, value in enumerate(tuple_values): 
-            self.db.ChangeValuesInTable('images', 'image', (value,), f'image_id={i+1}')
+        tuple_values = self.FromFilesInFolderToBlobTuple('img\\AccountsPics') 
+        for i, value in enumerate(tuple_values): # iterates over the images and inserts them into the database 
+            self.db.ChangeValuesInTable('images', 'image', (value,), f'image_id={i+1}') 
         
     def SetupProfSimulatorGui(self):
         self._prof_window_cascades = ['Menu', 'Classes']
         self._class_window_cascades = ['Menu', 'Students', 'Homework', 'Notes']
         self._student_window_cascades = ['Menu', 'Grades', 'Notes']
-     
-        # classes = from database, below is just example <--
-        self._prof_window_buttons = [{
-                'Profile': self.ProfWindow, 
-                'Exit': self.gui.root.quit}, 
-               {
-                '1A': lambda: self.ClassWindow('1A'),   
-                '3H': lambda: self.ClassWindow('3H'), 
-                '4G': lambda: self.ClassWindow('4G')}]
         
-        self._class_window_buttons = [{
-                'Profile': self.ProfWindow, 
-                'Exit': self.gui.root.destroy},
+        self._menu_cascade_buttons = {
+            'Profile': self.ProfWindow, 
+            'Exit': self.gui.root.quit
+        }
+
+        self._classes_cascade_buttons = {}
+        classes = self.db.ReadFromTable('classes', 'year, section') # get all classes from database
+        for class_ in classes:
+            self._classes_cascade_buttons.update({f'{class_[0]}{class_[1]}': lambda: self.ClassWindow(class_)}) # creates a button for each class, with the name of the class as label and the function to open the class window as command
+            
+        self._prof_window_buttons = [
+            self._menu_cascade_buttons,
+            self._classes_cascade_buttons
+        ]
+        
+        self._class_window_buttons = [self._menu_cascade_buttons,
                {
                 'John Smith': self.StudentWindow}, 
                lambda: self.HomeworkWindow(), 
                lambda:self.NotesWindow()]
         
-        self._student_window_buttons = [{
-                'Profile': self.ProfWindow, 
-                'Exit': self.gui.root.quit},
+        self._student_window_buttons = [self._menu_cascade_buttons,
                lambda: self.GradesWindow(), 
                lambda: self.NotesWindow()]
     
@@ -312,7 +316,7 @@ class Controller:
     # give output to database class
 
 def main():
-    controller = Controller('marco', '500x500', 'db\\file.db', 'Prof Simulator') 
+    controller = Controller('PROF SIMULATOR', '500x500', 'db\\file.db', 'Prof Simulator') 
     controller.GuiMainloop()
     
 if __name__ == '__main__': 
