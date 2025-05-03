@@ -5,7 +5,7 @@ from pathlib import Path
 import os
 
 # TODO: Control SQlite class functions, check if they work (create table and insert into table are already checked)
-# TODO: Continue developing Controller class
+#TODO: FIX IMAGE LOADING
 class SQLite: 
     # NEED TO UNDERSTAND when to commit
     def __init__(self, path): 
@@ -124,28 +124,33 @@ class GUI:
                 self.SetupMenuButton(cascade, buttons[i]) # assigns the function to the menu
             i += 1        
                     
-    def NewLabel(self, root_name="", text="PutTextHere", font=('Helvetica', 12)):
+    def NewLabel(self, attach_to_previous_menu=False, text="", font=('Helvetica', 12), padx=1, pady=1, width=0, height=0):
         """Creates a new label
         Args:
-            root_name (str): name of the root, if empty, it will be the root of the GUI
+            attach_to_previous_menu (bool): if True, it will be attached to the previous menu, otherwise it will be attached to the root
             text (str): text of the label
             font (tuple): font of the label, name of font and size
+            padx (int): padding in x direction
+            pady (int): padding in y direction
+            width (int): width of the label
+            height (int): height of the label
         """
-        if root_name == "": 
-            self.label = tk.Label(self.root, text=text, font=font)
+        if attach_to_previous_menu: 
+            root = self.bar
         else: 
-            self.label = tk.Label(root_name, text=text, font=font)
+            root = self.root
             
-        self.label.pack()
+        self.label = tk.Label(root, text=text, font=font, width=width, height=height)
+        self.label.pack(padx=padx, pady=pady)
         
-    def NewImage(self, img): 
+    def NewImage(self, path, padx=1, pady=1): 
         '''Creates a new image
         Args:
-            path (str): path of the image 
-            img (UNDERSTAND WHICH DATA TYPE THE VAR NEEDS TO BE TO BE PASSABLE AS ARGUMENT INSIDE self.paneL)
-        '''
-        self.panel = tk.Label(self.root, image = img) 
-        self.panel.pack(side = "bottom", fill = "both", expand = "yes")
+            path (str): path of the image, PADX AND PADY AND WAYS TO SET LABEL PARAMETER
+        ''' 
+        image = tk.PhotoImage(file=path) 
+        self.panel = tk.Label(self.root, image=image ) 
+        self.panel.pack(side = "bottom", fill = "both", expand = "yes",padx=padx, pady=pady)
         
     def SetupMenu(self, title=""): 
         '''Creates a new menu or cascade
@@ -197,7 +202,8 @@ class Controller:
         
     def CorrectsDataTypesOfStrTuple(self, old_tuple):
         '''Takes a tuple as a parameter and returns a tuple with corrected data types for each element,\n
-        Supports integer, float and bool changes
+        Supports integer, float and bool changes\n
+        Strings that start with ' and end with ' are converted to strings, despite the possible data type\n
         Args:
             old_tuple (tuple): tuple to be transformed
         '''
@@ -256,15 +262,17 @@ class Controller:
                 self.db.InsertIntoTable(table, columns, tuple_values) 
         file.close()        
                 
-        tuple_values = self.FromFilesInFolderToBlobTuple('img\\AccountsPics') 
+        tuple_values = self.FromFilesInFolderToBlobTuple('img\\Pics') 
         for i, value in enumerate(tuple_values): # iterates over the images and inserts them into the database 
             self.db.ChangeValuesInTable('images', 'image', (value,), f'image_id={i+1}') 
         
     def SetupProfSimulatorGui(self):
-        self._prof_window_cascades = ['Menu', 'Classes']
+        # Cascades, buttons made to show other buttons
+        self._prof_window_cascades = ['Menu', 'Classes'] 
         self._class_window_cascades = ['Menu', 'Students', 'Homework', 'Notes']
         self._student_window_cascades = ['Menu', 'Grades', 'Notes']
         
+        # Buttons, the ones opened by each cascade
         self._menu_cascade_buttons = {
             'Profile': self.ProfWindow, 
             'Exit': self.gui.root.quit
@@ -275,25 +283,30 @@ class Controller:
         for class_ in classes:
             self._classes_cascade_buttons.update({f'{class_[0]}{class_[1]}': lambda: self.ClassWindow(class_)}) # creates a button for each class, with the name of the class as label and the function to open the class window as command
             
+        # Windows, each one has it's own bar, so it's own cascades
         self._prof_window_buttons = [
             self._menu_cascade_buttons,
             self._classes_cascade_buttons
         ]
         
-        self._class_window_buttons = [self._menu_cascade_buttons,
-               {
-                'John Smith': self.StudentWindow}, 
-               lambda: self.HomeworkWindow(), 
-               lambda:self.NotesWindow()]
+        self._class_window_buttons = [
+            self._menu_cascade_buttons,
+            {'John Smith': self.StudentWindow}, 
+            lambda: self.HomeworkWindow(), 
+            lambda: self.NotesWindow()
+        ]
         
-        self._student_window_buttons = [self._menu_cascade_buttons,
-               lambda: self.GradesWindow(), 
-               lambda: self.NotesWindow()]
+        self._student_window_buttons = [
+            self._menu_cascade_buttons,
+            lambda: self.GradesWindow(), 
+            lambda: self.NotesWindow()
+        ]
     
         self.ProfWindow()
         
     def ProfWindow(self, prof_id = 1):
         self.gui.NewBar(self._prof_window_cascades, self._prof_window_buttons) 
+        self.gui.NewImage('img\\logo.png')
     
     def ClassWindow(self, class_): 
         self.gui.NewBar(self._class_window_cascades, self._class_window_buttons) 
