@@ -1,97 +1,8 @@
+import os
 import tkinter as tk
-import sqlite3 as sql
 from csv import reader
 from pathlib import Path
-import os
-
-# TODO: Control SQlite class functions, check if they work (create table and insert into table are already checked)
-#TODO: FIX IMAGE LOADING
-class SQLite: 
-    # NEED TO UNDERSTAND when to commit
-    def __init__(self, path): 
-        '''Creates a new SQLite database
-        Args:
-            path (str): path to the database
-        '''
-        self.connection = sql.connect(path)
-        self.cursor = self.connection.cursor()
-        
-    def Execute(self, command):
-        '''DEVELOPER ONLY, Executes a command in the database  
-        Args:
-            command (str): command to be executed
-        '''
-        self.cursor.execute(command)
-            
-    def CreateTable(self, table_name, column_names): 
-        '''Creates a table in the database
-        Args:
-            table_name (str): name of the table
-            columns_names (str): name of columns of the table, each column is separated by a comma
-        '''
-        self.cursor.execute(f"CREATE TABLE {table_name} ({column_names})") 
-        self.cursor.connection.commit()
-        
-    def InsertIntoTable(self, table_name, columns, values):
-        '''Inserts values into the table   
-        Args:
-            table_name (str): name of the table
-            columns (str): columns of the table
-            values (tuple of str): values to be inserted
-        '''
-        placeholders = ('?,' * len(values))[:-1] # string with as many ? as values, then removes last char, which is ','
-        
-        self.cursor.execute(f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders});", values)
-        self.cursor.connection.commit()
-        
-    def ChangeValuesInTable(self, table_name, columns, values, condition):
-        '''Changes values in the table
-        Args:
-            table_name (str): name of the table
-            columns (str): columns to be changed, each column is separated by a comma
-            values (tuple): values to insert
-            condition (str): condition to change values
-        '''
-        placeholders = ('?,' * len(values))[:-1] 
-
-        self.cursor.execute(f"UPDATE {table_name} SET {columns} = {placeholders} WHERE {condition};", values)
-        self.cursor.connection.commit()
-        
-    def ReadFromTable(self, table_name, columns, condition = True, response_size = 0):
-        '''Returns rows (list of tuples) from the table
-        Args: 
-            table_name (str): name of the table
-            columns (str): columns to be returned, each column is separated by a comma
-            condition (str): condition to return values
-            response_size (int): number of rows to be returned 
-        Returns: 
-            list of tuples (table rows)
-        '''
-        self.cursor.execute(f"SELECT {columns} FROM {table_name} WHERE {condition};")
-        
-        if response_size == 0:
-            response = self.cursor.fetchall()
-        else: 
-            response = self.cursor.fetchmany(response_size)
-    
-        return response
-        
-    def DeleteTable(self, table_name): 
-        '''Deletes a table from the database
-        Args:
-            table_name (str): name of the table
-        ''' 
-        self.cursor.execute(f"DROP TABLE {table_name};")
-        self.cursor.connection.commit()
-        
-    def DeleteFromTable(self, table_name, condition): 
-        '''Deletes values from the table
-        Args:
-            table_name (str): name of the table
-            condition (str): condition to delete values
-        '''
-        self.cursor.execute(f"DELETE FROM {table_name} WHERE {condition};")
-        self.cursor.connection.commit()
+import my_sqlite
       
 class GUI: 
     # logo, pic, buttons
@@ -143,14 +54,25 @@ class GUI:
         self.label = tk.Label(root, text=text, font=font, width=width, height=height)
         self.label.pack(padx=padx, pady=pady)
         
-    def NewImage(self, path, padx=1, pady=1): 
+    def NewImage(self, path, padx=1, pady=1, side="top", zoom=1): 
         '''Creates a new image
         Args:
-            path (str): path of the image, PADX AND PADY AND WAYS TO SET LABEL PARAMETER
+            path (str): path of the image, PADX AND PADY AND WAYS TO SET LABEL PARAMETER 
+            padx (int): padding in x direction
+            pady (int): padding in y direction
+            side (str): side of the image, top, bottom, left, right
+            zoom (int): zoom of the image, 1 = no zoom, 2 = double size, -1 = half size
         ''' 
         image = tk.PhotoImage(file=path) 
+        
+        if zoom > 1: 
+            image = image.zoom(zoom, zoom)
+        elif zoom <= -1:
+            image = image.subsample(-zoom, -zoom)
+            
         self.panel = tk.Label(self.root, image=image ) 
-        self.panel.pack(side = "bottom", fill = "both", expand = "yes",padx=padx, pady=pady)
+        self.panel.image = image # keep a reference to avoid garbage collection
+        self.panel.pack(side=side, fill="both", padx=padx, pady=pady) # fills the whole window
         
     def SetupMenu(self, title=""): 
         '''Creates a new menu or cascade
@@ -190,7 +112,7 @@ class Controller:
             type (str): type of premade GUI and DB(Prof Simulator)
         '''
         self.gui = GUI(gui_title, gui_size)
-        self.db = SQLite(database_path)
+        self.db = my_sqlite.SQLite(database_path)
         
         if type == 'Prof Simulator': 
             if os.path.getsize(database_path) == 0: # creates and populate new db only if it's first access
@@ -306,8 +228,9 @@ class Controller:
         
     def ProfWindow(self, prof_id = 1):
         self.gui.NewBar(self._prof_window_cascades, self._prof_window_buttons) 
-        self.gui.NewImage('img\\logo.png')
-    
+        # self.gui.NewImage('img\\logo.png', 0, 0, "right", -5) # logo of the app
+        # self.gui.NewImage('img\\Pics\\4.jpg', 0, 0, "left", 5) does not support jpg format
+
     def ClassWindow(self, class_): 
         self.gui.NewBar(self._class_window_cascades, self._class_window_buttons) 
     
